@@ -10,6 +10,7 @@ import { PortalAuthProvider } from './context/PortalAuthContext';
 import { RequestProvider } from './context/RequestContext';
 import { MessageProvider } from './context/MessageContext';
 import TaskDetailPanel from './components/TaskDetailPanel';
+import AuthGuard from './components/AuthGuard';
 
 export const metadata = {
   title: "Super 30 | Agency OS",
@@ -33,8 +34,10 @@ export default function RootLayout({ children }) {
                       <NoteProvider>
                         <ReminderProvider>
                           <BillingProvider>
-                            {children}
-                            <TaskDetailPanel />
+                            <AuthGuard>
+                              {children}
+                              <TaskDetailPanel />
+                            </AuthGuard>
                           </BillingProvider>
                         </ReminderProvider>
                       </NoteProvider>

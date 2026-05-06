@@ -8,7 +8,8 @@ export const INITIAL_TEAM = [
         status: 'Active',
         skills: ['Client Relations', 'Strategy', 'Project Management'],
         color: '#6366f1',
-        type: 'agency'
+        type: 'agency',
+        roleType: 'super_admin'
     },
     {
         id: 'u2',
@@ -19,7 +20,8 @@ export const INITIAL_TEAM = [
         status: 'Active',
         skills: ['Backlinks', 'Technical SEO', 'Keyword Research'],
         color: '#10b981',
-        type: 'agency'
+        type: 'agency',
+        roleType: 'admin'
     },
     {
         id: 'u3',
@@ -30,7 +32,9 @@ export const INITIAL_TEAM = [
         status: 'Active',
         skills: ['React', 'Next.js', 'API Integration'],
         color: '#f59e0b',
-        type: 'agency'
+        type: 'agency',
+        roleType: 'editor',
+        reportsTo: 'u2'
     },
     {
         id: 'u4',
@@ -41,7 +45,9 @@ export const INITIAL_TEAM = [
         status: 'Active',
         skills: ['UI/UX', 'Figma', 'Branding'],
         color: '#ec4899',
-        type: 'agency'
+        type: 'agency',
+        roleType: 'editor',
+        reportsTo: 'u2'
     },
     {
         id: 'u5',
@@ -52,7 +58,9 @@ export const INITIAL_TEAM = [
         status: 'On Leave',
         skills: ['Meta Ads', 'Google Ads', 'Copywriting'],
         color: '#06b6d4',
-        type: 'agency'
+        type: 'agency',
+        roleType: 'editor',
+        reportsTo: 'u1'
     },
     {
         id: 'c-u1',
@@ -63,6 +71,7 @@ export const INITIAL_TEAM = [
         status: 'Active',
         type: 'client',
         clientId: 'c1',
-        color: '#6366f1'
+        color: '#6366f1',
+        roleType: 'client'
     }
 ];

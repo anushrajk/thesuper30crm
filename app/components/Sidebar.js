@@ -2,26 +2,29 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Briefcase, Calendar, ListTodo, Settings, Megaphone, Users, Bell, Plus, CheckCircle2, Circle, X, FilePlus } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Calendar, ListTodo, Settings, Megaphone, Users, Bell, Plus, CheckCircle2, Circle, X, FilePlus, LogOut } from 'lucide-react';
 import { useReminders } from '../context/ReminderContext';
+import { useTeam } from '../context/TeamContext';
 import { useState } from 'react';
 
 export default function Sidebar() {
     const pathname = usePathname();
     const { reminders, addReminder, toggleReminder, deleteReminder } = useReminders();
+    const { currentUser, logout } = useTeam();
     const [newReminderText, setNewReminderText] = useState('');
 
     const isActive = (path) => pathname === path;
+    const userRole = currentUser?.roleType || 'editor';
 
     const navItems = [
-        { href: '/', icon: LayoutDashboard, label: 'Pipeline' },
-        { href: '/directory', icon: Briefcase, label: 'Active Clients' },
-        { href: '/team', icon: Users, label: 'Team' },
-        { href: '/tasks', icon: ListTodo, label: 'Tasks' },
-        { href: '/requests', icon: FilePlus, label: 'Requests' },
-        { href: '/campaigns', icon: Megaphone, label: 'Campaigns' },
-        { href: '/today', icon: Calendar, label: 'Today' },
-    ];
+        { href: '/', icon: LayoutDashboard, label: 'Pipeline', roles: ['super_admin'] },
+        { href: '/directory', icon: Briefcase, label: 'Active Clients', roles: ['super_admin', 'admin', 'editor'] },
+        { href: '/team', icon: Users, label: 'Team', roles: ['super_admin'] },
+        { href: '/tasks', icon: ListTodo, label: 'Tasks', roles: ['super_admin', 'admin', 'editor'] },
+        { href: '/requests', icon: FilePlus, label: 'Requests', roles: ['super_admin', 'admin'] },
+        { href: '/campaigns', icon: Megaphone, label: 'Campaigns', roles: ['super_admin', 'admin'] },
+        { href: '/today', icon: Calendar, label: 'Today', roles: ['super_admin', 'admin', 'editor'] },
+    ].filter(item => item.roles.includes(userRole));
 
     const handleAddReminder = (e) => {
         if (e.key === 'Enter' && newReminderText.trim()) {
@@ -32,9 +35,9 @@ export default function Sidebar() {
 
     return (
         <aside style={{ width: '280px', background: '#ffffff', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '24px', height: '100vh', overflow: 'hidden' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: '900', marginBottom: '32px', color: '#1a1a1a', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '32px', height: '32px', background: 'black', borderRadius: '8px' }}></div> Super 30
-            </h1>
+            <div style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src="https://www.thesuper30.ai/assets/super30-new-logo-qQg26tml.png" alt="Super30 Logo" style={{ height: '42px', width: 'auto', objectFit: 'contain' }} />
+            </div>
 
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px', padding: '0 12px' }}>MAIN MENU</div>
@@ -107,12 +110,28 @@ export default function Sidebar() {
                             background: isActive('/settings') ? '#fffbeb' : 'transparent',
                             borderRadius: '10px',
                             fontWeight: isActive('/settings') ? '700' : '500',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            marginBottom: '4px'
                         }}>
                             <Settings size={18} />
                             <span>Settings</span>
                         </div>
                     </Link>
+                    <div onClick={logout} style={{
+                        padding: '10px 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        color: '#ef4444',
+                        background: 'transparent',
+                        borderRadius: '10px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                    }} onMouseEnter={e => e.currentTarget.style.background = '#fef2f2'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <LogOut size={18} />
+                        <span>Log Out</span>
+                    </div>
                 </div>
             </nav>
         </aside>

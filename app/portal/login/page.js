@@ -49,18 +49,8 @@ export default function PortalLoginPage() {
                 border: '1px solid #f0f0f0'
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                    <div style={{
-                        width: '48px',
-                        height: '48px',
-                        background: 'black',
-                        borderRadius: '12px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        marginBottom: '20px'
-                    }}>
-                        <Lock size={24} />
+                    <div style={{ marginBottom: '20px' }}>
+                        <img src="https://www.thesuper30.ai/assets/super30-new-logo-qQg26tml.png" alt="Super30 Logo" style={{ height: '48px', width: 'auto', objectFit: 'contain' }} />
                     </div>
                     <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: '0 0 8px 0', color: '#1a1a1a' }}>Client Portal</h1>
                     <p style={{ color: '#666', fontSize: '0.9rem', margin: 0 }}>Secure access to your project dashboard</p>

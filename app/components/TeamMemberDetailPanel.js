@@ -1,26 +1,45 @@
 "use client";
 
+import { useState } from "react";
 import { useTasks } from "../context/TaskContext";
 import { useTeam } from "../context/TeamContext";
-import { X, Briefcase, Mail, Star, AlertCircle, CheckCircle2, Clock, Trash2, Plus, Zap } from "lucide-react";
-import TaskCard from "./TaskCard";
+import { X, Mail, Clock, Zap, Shield, ChevronDown } from "lucide-react";
 
 export default function TeamMemberDetailPanel({ memberId, onClose }) {
-    const { members } = useTeam();
-    const { tasks, updateTask } = useTasks();
+    const { members, currentUser, updateMember } = useTeam();
+    const { tasks } = useTasks();
     const member = (members || []).find(m => m.id === memberId);
+
+    const [roleType, setRoleType] = useState(member?.roleType || 'editor');
+    const [reportsTo, setReportsTo] = useState(member?.reportsTo || '');
+    const [name, setName] = useState(member?.name || '');
+    const [email, setEmail] = useState(member?.email || '');
+    const [jobTitle, setJobTitle] = useState(member?.role || '');
+    const [skills, setSkills] = useState((member?.skills || []).join(', '));
+    const [saved, setSaved] = useState(false);
+
     if (!member) return null;
 
+    const isSuperAdmin = currentUser?.roleType === 'super_admin';
+    const agencyManagers = members.filter(m => m.type === 'agency' && m.id !== memberId && m.roleType !== 'editor');
+
     const memberTasks = (tasks || []).filter(t => t.assigneeId === member.id);
-    const todoTasks = memberTasks.filter(t => t.status === 'todo');
     const inProgressTasks = memberTasks.filter(t => t.status === 'in-progress');
     const doneTasks = memberTasks.filter(t => t.status === 'done');
-
     const activeTasks = memberTasks.filter(t => t.status !== 'done').length;
     const highPriority = memberTasks.filter(t => t.priority === 'high' || t.priority === 'critical').length;
 
-    const handleUpdateTask = (id, updates) => {
-        updateTask(id, updates);
+    const handleSaveRole = () => {
+        updateMember(memberId, {
+            roleType,
+            reportsTo: reportsTo || null,
+            name,
+            email,
+            role: jobTitle,
+            skills: skills.split(',').map(s => s.trim()).filter(s => s !== '')
+        });
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
     };
 
     return (
@@ -121,6 +140,94 @@ export default function TeamMemberDetailPanel({ memberId, onClose }) {
                             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={16} /> {member.status}</span>
                         </div>
                     </div>
+
+                    {/* Role Assignment - Super Admin only */}
+                    {isSuperAdmin && member.roleType !== 'super_admin' && (
+                        <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '20px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                <Shield size={16} color="#6366f1" />
+                                <h4 style={{ margin: 0, fontSize: '0.85rem', fontWeight: '800', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Access & Permissions</h4>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '6px' }}>NAME</label>
+                                        <input
+                                            value={name}
+                                            onChange={e => setName(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none' }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '6px' }}>EMAIL</label>
+                                        <input
+                                            value={email}
+                                            onChange={e => setEmail(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none' }}
+                                        />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '6px' }}>JOB TITLE</label>
+                                        <select
+                                            value={jobTitle}
+                                            onChange={e => setJobTitle(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none', cursor: 'pointer' }}
+                                        >
+                                            <option>Account Manager</option>
+                                            <option>SEO Specialist</option>
+                                            <option>Ads Executive</option>
+                                            <option>Developer</option>
+                                            <option>Designer</option>
+                                            <option>Content Writer</option>
+                                            <option>Intern</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '6px' }}>SYSTEM ROLE</label>
+                                        <select
+                                            value={roleType}
+                                            onChange={e => setRoleType(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: '600', outline: 'none', cursor: 'pointer' }}
+                                        >
+                                            <option value="admin">Admin — Can assign tasks, manage campaigns</option>
+                                            <option value="editor">Editor — Executes assigned tasks only</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '6px' }}>SKILLS (COMMA SEPARATED)</label>
+                                    <input
+                                        value={skills}
+                                        onChange={e => setSkills(e.target.value)}
+                                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none' }}
+                                    />
+                                </div>
+                                {roleType === 'editor' && (
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '700', color: '#64748b', marginBottom: '6px' }}>REPORTS TO</label>
+                                        <select
+                                            value={reportsTo}
+                                            onChange={e => setReportsTo(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: '600', outline: 'none', cursor: 'pointer' }}
+                                        >
+                                            <option value="">— Select Manager —</option>
+                                            {agencyManagers.map(m => (
+                                                <option key={m.id} value={m.id}>{m.name} ({m.roleType})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={handleSaveRole}
+                                    style={{ padding: '12px 20px', background: saved ? '#10b981' : '#1a1a1a', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', fontSize: '1rem', marginTop: '8px' }}
+                                >
+                                    {saved ? '✓ Profile Updated!' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Task Breakdown */}
                     <div>

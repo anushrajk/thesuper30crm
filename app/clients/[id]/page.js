@@ -17,8 +17,8 @@ import PortalMessages from '../../components/ClientPortal/PortalMessages';
 
 export default function ClientControlPage({ params }) {
     const { id } = use(params);
-    const { getClientById } = useClients();
-    const { tasks } = useTasks();
+    const { getClientById, updateClient } = useClients();
+    const { tasks, addTask: createNewTask, SERVICE_TYPES } = useTasks();
     const { campaigns } = useCampaigns();
 
     const client = getClientById(id);
@@ -107,6 +107,58 @@ export default function ClientControlPage({ params }) {
 
                         {/* Right Sidebar */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                            {/* Client Services Selection */}
+                            <div style={{ background: 'white', padding: '24px', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                    <Sparkles size={18} style={{ color: '#6366f1' }} />
+                                    <h3 style={{ fontSize: '0.9rem', fontWeight: '800', color: '#1a1a1a', margin: 0 }}>ACTIVE SERVICES</h3>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {SERVICE_TYPES.map(service => {
+                                        const isSelected = client.services?.includes(service.id);
+                                        return (
+                                            <div 
+                                                key={service.id}
+                                                onClick={() => {
+                                                    const currentServices = client.services || [];
+                                                    const newServices = isSelected 
+                                                        ? currentServices.filter(id => id !== service.id)
+                                                        : [...currentServices, service.id];
+                                                    updateClient(id, { services: newServices });
+                                                }}
+                                                style={{ 
+                                                    padding: '12px 14px', 
+                                                    borderRadius: '10px', 
+                                                    border: `1.5px solid ${isSelected ? '#1a1a1a' : '#f1f5f9'}`,
+                                                    background: isSelected ? '#f8fafc' : 'white',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <span style={{ fontWeight: '700', fontSize: '0.85rem', color: isSelected ? '#1a1a1a' : '#94a3b8' }}>{service.label}</span>
+                                                <div style={{ 
+                                                    width: '18px', 
+                                                    height: '18px', 
+                                                    borderRadius: '5px', 
+                                                    border: `2px solid ${isSelected ? '#1a1a1a' : '#cbd5e1'}`,
+                                                    background: isSelected ? '#1a1a1a' : 'white',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'white',
+                                                    fontSize: '10px'
+                                                }}>
+                                                    {isSelected && '✓'}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             <div style={{ background: 'white', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
                                 <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '16px', color: '#666' }}>PEOPLE</h3>
                                 <div style={{ display: 'flex', gap: '-8px' }}>
@@ -169,8 +221,6 @@ export default function ClientControlPage({ params }) {
                 );
         }
     };
-
-    const { addTask: createNewTask } = useTasks();
 
     const handleQuickAddTask = () => {
         createNewTask({

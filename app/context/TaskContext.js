@@ -2,22 +2,34 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_TASKS } from '../data/tasks';
-import { INITIAL_CLIENTS } from '../data/clients';
 
 const TaskContext = createContext();
 
 export function TaskProvider({ children }) {
+    const [notifications, setNotifications] = useState([]);
+    
     // Initialize tasks from localStorage or fall back to mock data
     const [tasks, setTasks] = useState(() => {
+        let initialTasks = INITIAL_TASKS;
         if (typeof window !== 'undefined') {
             try {
                 const saved = localStorage.getItem('molten_tasks');
-                if (saved) return JSON.parse(saved);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    // Migrate legacy fields to 'notes'
+                    return parsed.map(t => ({
+                        ...t,
+                        notes: t.notes || (t.description ? `${t.description}${t.remarks ? `\n\nRemarks: ${t.remarks}` : ''}` : t.remarks || '')
+                    }));
+                }
             } catch (error) {
                 console.error('Error parsing task data from localStorage:', error);
             }
         }
-        return INITIAL_TASKS;
+        return initialTasks.map(t => ({
+            ...t,
+            notes: t.notes || (t.description ? `${t.description}${t.remarks ? `\n\nRemarks: ${t.remarks}` : ''}` : t.remarks || '')
+        }));
     });
 
     // Persist to localStorage whenever tasks change
@@ -89,6 +101,23 @@ export function TaskProvider({ children }) {
 
     // Actions
 
+    const addNotification = (title, message, type = 'info', userId = null) => {
+        const newNotif = {
+            id: Date.now(),
+            title,
+            message,
+            type,
+            userId, // Targeted notification
+            read: false,
+            createdAt: new Date().toISOString()
+        };
+        setNotifications(prev => [newNotif, ...prev].slice(0, 50));
+    };
+
+    const markAllNotificationsRead = () => {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    };
+
     const addTask = (taskData) => {
         const newTask = {
             id: `t-${Date.now()}`,
@@ -98,6 +127,12 @@ export function TaskProvider({ children }) {
             ...taskData
         };
         setTasks(prev => [...prev, newTask]);
+
+        // Notify if assigned to someone
+        if (newTask.assigneeId) {
+            addNotification('New Task Assigned', `Task: ${newTask.title}`, 'task', newTask.assigneeId);
+        }
+
         return newTask;
     };
 
@@ -137,6 +172,16 @@ export function TaskProvider({ children }) {
     // Data Accessors include getSelectedTask
     const getSelectedTask = () => tasks.find(t => t.id === selectedTaskId);
 
+    const SERVICE_TYPES = [
+        { id: 'seo', label: 'SEO' },
+        { id: 'smo', label: 'SMO' },
+        { id: 'pm', label: 'PM' },
+        { id: 'content', label: 'Content' },
+        { id: 'design', label: 'Design' },
+        { id: 'dev', label: 'Dev' },
+        { id: 'other', label: 'Other' }
+    ];
+
     const value = {
         tasks,
         selectedTaskId,
@@ -149,7 +194,11 @@ export function TaskProvider({ children }) {
         addTask,
         insertTaskAfter,
         updateTask,
-        deleteTask
+        deleteTask,
+        SERVICE_TYPES,
+        notifications,
+        addNotification,
+        markAllNotificationsRead
     };
 
     return (
@@ -174,7 +223,8 @@ export function useTasks() {
             addTask: () => ({ id: 'temp' }),
             insertTaskAfter: () => ({ id: 'temp' }),
             updateTask: () => { },
-            deleteTask: () => { }
+            deleteTask: () => { },
+            SERVICE_TYPES: []
         };
     }
     return context;

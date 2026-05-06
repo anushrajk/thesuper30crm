@@ -1,15 +1,21 @@
 "use client";
 
 import { useState } from 'react';
-import { X, User, Mail, Briefcase, Star } from 'lucide-react';
+import { X } from 'lucide-react';
+import { useTeam } from '../context/TeamContext';
 
 export default function NewMemberModal({ isOpen, onClose, onAdd }) {
+    const { members } = useTeam();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         role: 'SEO Specialist',
+        roleType: 'editor',
+        reportsTo: '',
         skills: ''
     });
+
+    const managers = members.filter(m => m.type === 'agency' && (m.roleType === 'super_admin' || m.roleType === 'admin'));
 
     if (!isOpen) return null;
 
@@ -19,10 +25,11 @@ export default function NewMemberModal({ isOpen, onClose, onAdd }) {
             ...formData,
             type: 'agency',
             skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== ''),
-            color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0') // Random color with padding
+            reportsTo: formData.roleType === 'editor' ? (formData.reportsTo || null) : null,
+            color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')
         };
         onAdd(memberData);
-        setFormData({ name: '', email: '', role: 'SEO Specialist', skills: '' });
+        setFormData({ name: '', email: '', role: 'SEO Specialist', roleType: 'editor', reportsTo: '', skills: '' });
         onClose();
     };
 
@@ -83,7 +90,7 @@ export default function NewMemberModal({ isOpen, onClose, onAdd }) {
                     </div>
 
                     <div>
-                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#666', marginBottom: '8px' }}>ROLE</label>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#666', marginBottom: '8px' }}>JOB TITLE</label>
                         <select
                             value={formData.role}
                             onChange={e => setFormData({ ...formData, role: e.target.value })}
@@ -98,6 +105,35 @@ export default function NewMemberModal({ isOpen, onClose, onAdd }) {
                             <option>Intern</option>
                         </select>
                     </div>
+
+                    <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#666', marginBottom: '8px' }}>SYSTEM ROLE</label>
+                        <select
+                            value={formData.roleType}
+                            onChange={e => setFormData({ ...formData, roleType: e.target.value })}
+                            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', background: 'white' }}
+                        >
+                            <option value="super_admin">Super Admin — full access</option>
+                            <option value="admin">Admin — manage campaigns & assign tasks</option>
+                            <option value="editor">Editor — execute assigned tasks only</option>
+                        </select>
+                    </div>
+
+                    {formData.roleType === 'editor' && (
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#666', marginBottom: '8px' }}>REPORTS TO</label>
+                            <select
+                                value={formData.reportsTo}
+                                onChange={e => setFormData({ ...formData, reportsTo: e.target.value })}
+                                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', background: 'white' }}
+                            >
+                                <option value="">— No manager assigned —</option>
+                                {managers.map(m => (
+                                    <option key={m.id} value={m.id}>{m.name} ({m.roleType})</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div>
                         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#666', marginBottom: '8px' }}>SKILLS (COMMA SEPARATED)</label>

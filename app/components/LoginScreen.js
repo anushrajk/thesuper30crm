@@ -1,0 +1,156 @@
+"use client";
+
+import React, { useState } from 'react';
+import { useTeam } from '../context/TeamContext';
+import { Lock, Mail, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+
+export default function LoginScreen() {
+    const { login } = useTeam();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
+        // Simulate network delay for premium feel
+        setTimeout(() => {
+            const result = login(email, password);
+            if (!result.success) {
+                setError(result.error);
+                setIsLoading(false);
+            }
+        }, 800);
+    };
+
+    const inputStyle = {
+        width: '100%',
+        padding: '14px 16px 14px 44px',
+        background: 'rgba(255, 255, 255, 0.05)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '12px',
+        color: 'white',
+        fontSize: '1rem',
+        outline: 'none',
+        transition: 'all 0.3s ease',
+        backdropFilter: 'blur(10px)',
+    };
+
+    return (
+        <div style={{ 
+            minHeight: '100vh', 
+            width: '100vw', 
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            {/* Background Orbs */}
+            <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%)', borderRadius: '50%', filter: 'blur(40px)' }} />
+            <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(236,72,153,0.15) 0%, rgba(0,0,0,0) 70%)', borderRadius: '50%', filter: 'blur(40px)' }} />
+
+            <div style={{
+                width: '100%',
+                maxWidth: '440px',
+                padding: '48px',
+                background: 'rgba(15, 23, 42, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '24px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                position: 'relative',
+                zIndex: 10
+            }}>
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)', marginBottom: '24px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.5)' }}>
+                        <Zap size={32} color="white" fill="white" />
+                    </div>
+                    <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>Super 30 OS</h1>
+                    <p style={{ color: '#94a3b8', fontSize: '1rem', margin: 0 }}>Log in to access your agency dashboard</p>
+                </div>
+
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    
+                    {error && (
+                        <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: '#fca5a5', fontSize: '0.9rem' }}>
+                            <ShieldCheck size={18} />
+                            <span>{error}</span>
+                        </div>
+                    )}
+
+                    <div style={{ position: 'relative' }}>
+                        <Mail size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
+                        <input 
+                            type="email" 
+                            placeholder="Email address" 
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            style={inputStyle}
+                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                            required
+                        />
+                    </div>
+
+                    <div style={{ position: 'relative' }}>
+                        <Lock size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
+                        <input 
+                            type="password" 
+                            placeholder="Password" 
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            style={inputStyle}
+                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                            required
+                        />
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        disabled={isLoading}
+                        style={{
+                            marginTop: '8px',
+                            width: '100%',
+                            padding: '16px',
+                            background: isLoading ? '#4f46e5' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '12px',
+                            fontSize: '1rem',
+                            fontWeight: '700',
+                            cursor: isLoading ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            transition: 'all 0.3s ease',
+                            boxShadow: '0 4px 15px -3px rgba(99, 102, 241, 0.4)',
+                            opacity: isLoading ? 0.7 : 1
+                        }}
+                        onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                        onMouseLeave={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(0)'; }}
+                    >
+                        {isLoading ? 'Authenticating...' : 'Sign In'}
+                        {!isLoading && <ArrowRight size={18} />}
+                    </button>
+                </form>
+
+                <div style={{ marginTop: '32px', textAlign: 'center', paddingTop: '24px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0 0 12px 0' }}>Demo Accounts (Password: admin123)</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: '#94a3b8' }}>
+                        <span><strong>Super Admin:</strong> sarah@agencyos.com</span>
+                        <span><strong>Admin:</strong> mike@agencyos.com</span>
+                        <span><strong>Editor:</strong> jasmine@agencyos.com</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

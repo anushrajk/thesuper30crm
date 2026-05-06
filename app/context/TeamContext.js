@@ -9,16 +9,33 @@ export function TeamProvider({ children }) {
     const [members, setMembers] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('agency_team');
-            if (saved) return JSON.parse(saved);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Schema migration: if old data doesn't have roleType, reset to INITIAL_TEAM
+                if (parsed.length > 0 && !parsed[0].roleType) {
+                    return INITIAL_TEAM;
+                }
+                return parsed;
+            }
         }
         return INITIAL_TEAM;
     });
 
-    // Persistence and Cross-Tab Sync
+    const [currentUserId, setCurrentUserId] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('agency_auth_token') || null;
+        }
+        return null;
+    });
+
+    // Persistence and Cross-Tab Sync for Team Data
     useEffect(() => {
         const handleStorageChange = (e) => {
             if (e.key === 'agency_team' && e.newValue) {
                 setMembers(JSON.parse(e.newValue));
+            }
+            if (e.key === 'agency_auth_token') {
+                setCurrentUserId(e.newValue);
             }
         };
 
@@ -31,6 +48,30 @@ export function TeamProvider({ children }) {
             localStorage.setItem('agency_team', JSON.stringify(members));
         }
     }, [members]);
+
+    const login = (email, password) => {
+        // Hardcoded generic password for all test accounts
+        if (password !== 'admin123') {
+            return { success: false, error: 'Invalid password. Hint: admin123' };
+        }
+
+        const member = members.find(m => m.email.toLowerCase() === email.toLowerCase());
+        if (member) {
+            setCurrentUserId(member.id);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('agency_auth_token', member.id);
+            }
+            return { success: true };
+        }
+        return { success: false, error: 'User not found' };
+    };
+
+    const logout = () => {
+        setCurrentUserId(null);
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('agency_auth_token');
+        }
+    };
 
     const addMember = (member) => {
         const newMember = {
@@ -61,9 +102,27 @@ export function TeamProvider({ children }) {
         return members.filter(m => m.type === 'agency');
     };
 
+    const currentUser = currentUserId ? members.find(m => m.id === currentUserId) : null;
+
+    const getAssignableMembers = () => {
+        if (!currentUser) return [];
+        if (currentUser.roleType === 'super_admin') {
+            return members.filter(m => m.type === 'agency');
+        } else if (currentUser.roleType === 'admin') {
+            return members.filter(m => m.id === currentUser.id || m.reportsTo === currentUser.id);
+        } else {
+            return [currentUser];
+        }
+    };
+
     return (
         <TeamContext.Provider value={{
             members,
+            currentUser,
+            login,
+            logout,
+            setCurrentUserId, // keep for internal testing if needed
+            getAssignableMembers,
             addMember,
             updateMember,
             deleteMember,
@@ -81,6 +140,11 @@ export const useTeam = () => {
     if (!context) {
         return {
             members: [],
+            currentUser: null,
+            login: () => { },
+            logout: () => { },
+            setCurrentUserId: () => {},
+            getAssignableMembers: () => [],
             addMember: () => { },
             updateMember: () => { },
             deleteMember: () => { },

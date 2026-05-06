@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useRef } from 'react';
 import { Send, User, Clock } from 'lucide-react';
 import { useMessages } from '../../context/MessageContext';

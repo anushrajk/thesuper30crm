@@ -120,6 +120,23 @@ export default function TaskCard({ task, isOverlay, onUpdate, onAddNext, onRemov
                 }}
             />
 
+            {/* Service Label Badge */}
+            {task.service && (
+                <span style={{
+                    fontSize: '0.65rem',
+                    fontWeight: '800',
+                    color: '#6366f1',
+                    background: '#e0e7ff',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.02em',
+                    flexShrink: 0
+                }}>
+                    {task.service}
+                </span>
+            )}
+
             {/* Assignee Initial */}
             {task.assigneeInitials && (
                 <div

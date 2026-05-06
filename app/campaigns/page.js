@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 import { Plus, Filter, TrendingUp, DollarSign, Calendar, Megaphone, Trash2 } from 'lucide-react';
 import { useClients } from '../context/ClientContext';
 import Link from 'next/link';
-import { useCampaigns, deleteCampaign } from '../context/CampaignContext';
+import { useCampaigns } from '../context/CampaignContext';
 import { CAMPAIGN_STATUSES } from '../data/campaigns';
 import CampaignModal from '../components/CampaignModal';
 import ActionMenu from '../components/ActionMenu';

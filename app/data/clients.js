@@ -39,7 +39,8 @@ export const INITIAL_CLIENTS = [
             leads: 38,
             spend: 4120,
             cpl: 108
-        }
+        },
+        services: ['seo', 'smo', 'content']
     },
     {
         id: 'c2',
@@ -73,7 +74,8 @@ export const INITIAL_CLIENTS = [
             leads: 12,
             spend: 1500,
             cpl: 125
-        }
+        },
+        services: ['seo', 'design']
     },
     {
         id: 'c3',
@@ -107,7 +109,8 @@ export const INITIAL_CLIENTS = [
             leads: 5,
             spend: 2000,
             cpl: 400
-        }
+        },
+        services: ['seo', 'smo', 'pm', 'content', 'design', 'dev', 'other']
     },
     {
         id: 'c4',
@@ -141,6 +144,7 @@ export const INITIAL_CLIENTS = [
             leads: 0,
             spend: 0,
             cpl: 0
-        }
+        },
+        services: ['seo']
     },
 ];
