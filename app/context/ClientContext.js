@@ -1,75 +1,107 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_CLIENTS } from '../data/clients';
+import { supabase } from '../lib/supabaseClient';
 
 const ClientContext = createContext();
 
+const mapClient = (c) => ({
+    ...c,
+    ownerId: c.owner_id,
+    createdAt: c.created_at
+});
+
+const unmapClient = (c) => {
+    const out = { ...c };
+    if (c.ownerId !== undefined) out.owner_id = c.ownerId;
+    if (c.createdAt !== undefined) out.created_at = c.createdAt;
+    delete out.ownerId;
+    delete out.createdAt;
+    return out;
+};
+
 export function ClientProvider({ children }) {
-    const [clients, setClients] = useState(() => {
-        if (typeof window !== 'undefined') {
-            try {
-                const saved = localStorage.getItem('agency_clients');
-                if (saved) return JSON.parse(saved);
-            } catch (error) {
-                console.error('Error parsing client data from localStorage:', error);
-            }
-        }
-        return INITIAL_CLIENTS;
-    });
+    const [clients, setClients] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Persistence and Cross-Tab Sync
+    // Initial Fetch & Realtime Subscription
     useEffect(() => {
-        const handleStorageChange = (e) => {
-            if (e.key === 'agency_clients' && e.newValue) {
-                try {
-                    setClients(JSON.parse(e.newValue));
-                } catch (error) {
-                    console.error('Error parsing updated client data from storage event:', error);
-                }
-            }
-        };
+        fetchClients();
 
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
+        // Subscribe to real-time changes
+        const channel = supabase
+            .channel('public:clients')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setClients(prev => [...prev, mapClient(payload.new)]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setClients(prev => prev.map(c => c.id === payload.new.id ? mapClient(payload.new) : c));
+                } else if (payload.eventType === 'DELETE') {
+                    setClients(prev => prev.filter(c => c.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('agency_clients', JSON.stringify(clients));
+    const fetchClients = async () => {
+        const { data, error } = await supabase
+            .from('clients')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (!error && data) {
+            setClients(data.map(mapClient));
         }
-    }, [clients]);
-
-    const addClient = (client) => {
-        const newClient = {
-            ...client,
-            id: `c${Date.now()}`,
-            createdAt: new Date().toISOString(),
-            stage: client.stage || 'inquiry',
-            health: client.health || 'On Track'
-        };
-        setClients(prev => [...prev, newClient]);
+        setIsLoading(false);
     };
 
-    const updateClient = (id, updates) => {
-        setClients(prev => prev.map(c => {
-            if (c.id === id) {
-                const updated = { ...c, ...updates };
+    const addClient = async (clientData) => {
+        const dbClient = unmapClient(clientData);
+        const { data, error } = await supabase
+            .from('clients')
+            .insert([{
+                ...dbClient,
+                stage: clientData.stage || 'inquiry',
+                created_at: new Date()
+            }])
+            .select();
 
-                // Automation: If moved to 'closed'
-                if (updates.stage === 'closed' && c.stage !== 'closed') {
-                    updated.onboardingDate = new Date().toISOString();
-                    updated.status = 'Active';
-                }
-
-                return updated;
-            }
-            return c;
-        }));
+        if (error) {
+            console.error('Error adding client:', error);
+            return null;
+        }
+        return mapClient(data[0]);
     };
 
-    const deleteClient = (id) => {
-        setClients(prev => prev.filter(c => c.id !== id));
+    const updateClient = async (id, updates) => {
+        // Optimistic update
+        setClients(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+
+        const dbUpdates = unmapClient(updates);
+        const { error } = await supabase
+            .from('clients')
+            .update(dbUpdates)
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error updating client:', error);
+            fetchClients();
+        }
+    };
+
+    const deleteClient = async (id) => {
+        const { error } = await supabase
+            .from('clients')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error deleting client:', error);
+        }
     };
 
     const getClientById = (id) => clients.find(c => c.id === id);
@@ -77,6 +109,7 @@ export function ClientProvider({ children }) {
     return (
         <ClientContext.Provider value={{
             clients,
+            isLoading,
             addClient,
             updateClient,
             deleteClient,
@@ -87,4 +120,17 @@ export function ClientProvider({ children }) {
     );
 }
 
-export const useClients = () => useContext(ClientContext);
+export const useClients = () => {
+    const context = useContext(ClientContext);
+    if (!context) {
+        return {
+            clients: [],
+            isLoading: true,
+            addClient: () => {},
+            updateClient: () => {},
+            deleteClient: () => {},
+            getClientById: () => null
+        };
+    }
+    return context;
+};

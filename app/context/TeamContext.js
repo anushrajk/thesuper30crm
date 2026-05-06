@@ -1,95 +1,162 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_TEAM } from '../data/team';
+import { supabase } from '../lib/supabaseClient';
 
 const TeamContext = createContext();
 
 export function TeamProvider({ children }) {
-    const [members, setMembers] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('agency_team');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Schema migration: if old data doesn't have roleType, reset to INITIAL_TEAM
-                if (parsed.length > 0 && !parsed[0].roleType) {
-                    return INITIAL_TEAM;
-                }
-                return parsed;
-            }
-        }
-        return INITIAL_TEAM;
-    });
+    const [members, setMembers] = useState([]);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    const [currentUserId, setCurrentUserId] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('agency_auth_token') || null;
-        }
-        return null;
-    });
-
-    // Persistence and Cross-Tab Sync for Team Data
+    // Initial session check and listener
     useEffect(() => {
-        const handleStorageChange = (e) => {
-            if (e.key === 'agency_team' && e.newValue) {
-                setMembers(JSON.parse(e.newValue));
+        // Check for existing session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                fetchProfile(session.user);
+            } else {
+                setIsLoading(false);
             }
-            if (e.key === 'agency_auth_token') {
-                setCurrentUserId(e.newValue);
-            }
-        };
+        });
 
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session) {
+                fetchProfile(session.user);
+            } else {
+                setCurrentUser(null);
+                setIsLoading(false);
+            }
+        });
+
+        // Also fetch all team members for context
+        fetchTeam();
+
+        return () => subscription.unsubscribe();
     }, []);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('agency_team', JSON.stringify(members));
-        }
-    }, [members]);
+    const fetchProfile = async (user) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
 
-    const login = (email, password) => {
-        // Hardcoded generic password for all test accounts
-        if (password !== 'admin123') {
-            return { success: false, error: 'Invalid password. Hint: admin123' };
-        }
-
-        const member = members.find(m => m.email.toLowerCase() === email.toLowerCase());
-        if (member) {
-            setCurrentUserId(member.id);
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('agency_auth_token', member.id);
+            if (error) {
+                console.error('Error fetching profile:', error);
+                // If profile doesn't exist, we might want to create a default one
+                // For now, just set basic info from auth
+                setCurrentUser({
+                    id: user.id,
+                    email: user.email,
+                    name: user.user_metadata?.name || user.email.split('@')[0],
+                    roleType: 'editor' // default
+                });
+            } else {
+                setCurrentUser(data);
             }
-            return { success: true };
-        }
-        return { success: false, error: 'User not found' };
-    };
-
-    const logout = () => {
-        setCurrentUserId(null);
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('agency_auth_token');
+        } catch (err) {
+            console.error('Profile fetch failed:', err);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const addMember = (member) => {
-        const newMember = {
-            type: 'agency', // Default to agency
-            ...member,
-            id: Date.now().toString(),
-            status: 'Active',
-            avatar: (member.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-        };
-        setMembers(prev => [...prev, newMember]);
+    const fetchTeam = async () => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*');
+        
+        if (!error && data) {
+            setMembers(data);
+        }
     };
 
-    const updateMember = (id, updates) => {
-        setMembers(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    const sendOtp = async (email) => {
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                emailRedirectTo: window.location.origin,
+            }
+        });
+
+        if (error) return { success: false, error: error.message };
+        return { success: true };
     };
 
-    const deleteMember = (id) => {
-        setMembers(prev => prev.filter(m => m.id !== id));
+    const verifyOtp = async (email, token) => {
+        // Try 'email' type (for existing users)
+        const { data, error } = await supabase.auth.verifyOtp({
+            email,
+            token,
+            type: 'email'
+        });
+
+        if (error) {
+            // Try 'signup' type (for new users)
+            const { data: data2, error: error2 } = await supabase.auth.verifyOtp({
+                email,
+                token,
+                type: 'signup'
+            });
+            
+            if (error2) {
+                // Try 'magiclink' just in case
+                const { data: data3, error: error3 } = await supabase.auth.verifyOtp({
+                    email,
+                    token,
+                    type: 'magiclink'
+                });
+                if (error3) return { success: false, error: error3.message };
+            }
+        }
+        
+        return { success: true };
+    };
+
+    const logout = async () => {
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+    };
+
+    // Database Actions
+    const addMember = async (member) => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .insert([{ ...member, created_at: new Date() }])
+            .select();
+        
+        if (!error && data) {
+            setMembers(prev => [...prev, ...data]);
+        }
+    };
+
+    const updateMember = async (id, updates) => {
+        const { error } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', id);
+        
+        if (!error) {
+            setMembers(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+            if (currentUser?.id === id) {
+                setCurrentUser(prev => ({ ...prev, ...updates }));
+            }
+        }
+    };
+
+    const deleteMember = async (id) => {
+        const { error } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', id);
+        
+        if (!error) {
+            setMembers(prev => prev.filter(m => m.id !== id));
+        }
     };
 
     const getMemberById = (id) => members.find(m => m.id === id);
@@ -99,15 +166,13 @@ export function TeamProvider({ children }) {
     };
 
     const getAgencyTeam = () => {
-        return members.filter(m => m.type === 'agency');
+        return members;
     };
-
-    const currentUser = currentUserId ? members.find(m => m.id === currentUserId) : null;
 
     const getAssignableMembers = () => {
         if (!currentUser) return [];
         if (currentUser.roleType === 'super_admin') {
-            return members.filter(m => m.type === 'agency');
+            return members;
         } else if (currentUser.roleType === 'admin') {
             return members.filter(m => m.id === currentUser.id || m.reportsTo === currentUser.id);
         } else {
@@ -119,9 +184,10 @@ export function TeamProvider({ children }) {
         <TeamContext.Provider value={{
             members,
             currentUser,
-            login,
+            isLoading,
+            sendOtp,
+            verifyOtp,
             logout,
-            setCurrentUserId, // keep for internal testing if needed
             getAssignableMembers,
             addMember,
             updateMember,

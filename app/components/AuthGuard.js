@@ -19,7 +19,7 @@ const DEFAULT_ROUTES = {
 };
 
 export default function AuthGuard({ children }) {
-    const { currentUser } = useTeam();
+    const { currentUser, isLoading } = useTeam();
     const [isMounted, setIsMounted] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
@@ -30,7 +30,7 @@ export default function AuthGuard({ children }) {
     }, []);
 
     useEffect(() => {
-        if (!isMounted || !currentUser) return;
+        if (!isMounted || isLoading || !currentUser) return;
 
         const role = currentUser.roleType || 'editor'; // fallback
         const allowedRoutes = ROLE_ROUTES[role] || ROLE_ROUTES['editor'];
@@ -45,10 +45,14 @@ export default function AuthGuard({ children }) {
         if (!hasAccess) {
             router.replace(DEFAULT_ROUTES[role] || '/tasks');
         }
-    }, [pathname, currentUser, isMounted, router]);
+    }, [pathname, currentUser, isMounted, isLoading, router]);
 
-    if (!isMounted) {
-        return <div style={{ height: '100vh', width: '100vw', background: '#0f172a' }}></div>; // Smooth loading state
+    if (!isMounted || isLoading) {
+        return (
+            <div style={{ height: '100vh', width: '100vw', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ color: 'white', fontSize: '1.2rem', fontWeight: '500' }}>Initializing Workspace...</div>
+            </div>
+        );
     }
 
     if (!currentUser) {

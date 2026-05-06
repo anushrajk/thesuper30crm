@@ -5,25 +5,37 @@ import { useTeam } from '../context/TeamContext';
 import { Lock, Mail, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
 
 export default function LoginScreen() {
-    const { login } = useTeam();
+    const { sendOtp, verifyOtp } = useTeam();
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [otp, setOtp] = useState('');
+    const [step, setStep] = useState('email'); // 'email' or 'otp'
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (e) => {
+    const handleSendOtp = async (e) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
 
-        // Simulate network delay for premium feel
-        setTimeout(() => {
-            const result = login(email, password);
-            if (!result.success) {
-                setError(result.error);
-                setIsLoading(false);
-            }
-        }, 800);
+        const result = await sendOtp(email);
+        if (result.success) {
+            setStep('otp');
+        } else {
+            setError(result.error);
+        }
+        setIsLoading(false);
+    };
+
+    const handleVerifyOtp = async (e) => {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
+        const result = await verifyOtp(email, otp);
+        if (!result.success) {
+            setError(result.error);
+            setIsLoading(false);
+        }
     };
 
     const inputStyle = {
@@ -37,6 +49,7 @@ export default function LoginScreen() {
         outline: 'none',
         transition: 'all 0.3s ease',
         backdropFilter: 'blur(10px)',
+        boxSizing: 'border-box'
     };
 
     return (
@@ -48,7 +61,8 @@ export default function LoginScreen() {
             alignItems: 'center', 
             justifyContent: 'center',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            fontFamily: 'Inter, system-ui, sans-serif'
         }}>
             {/* Background Orbs */}
             <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%)', borderRadius: '50%', filter: 'blur(40px)' }} />
@@ -68,14 +82,16 @@ export default function LoginScreen() {
                 zIndex: 10
             }}>
                 <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #6366f1 0%, #ec4899 100%)', marginBottom: '24px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.5)' }}>
-                        <Zap size={32} color="white" fill="white" />
+                    <div style={{ marginBottom: '24px' }}>
+                        <img src="https://www.thesuper30.ai/assets/super30-new-logo-qQg26tml.png" alt="Super30 Logo" style={{ height: '52px', width: 'auto', filter: 'brightness(0) invert(1)' }} />
                     </div>
-                    <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>Super 30 OS</h1>
-                    <p style={{ color: '#94a3b8', fontSize: '1rem', margin: 0 }}>Log in to access your agency dashboard</p>
+                    <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>Agency OS</h1>
+                    <p style={{ color: '#94a3b8', fontSize: '1rem', margin: 0 }}>
+                        {step === 'email' ? 'Enter your email to receive a login code' : `We've sent a code to ${email}`}
+                    </p>
                 </div>
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <form onSubmit={step === 'email' ? handleSendOtp : handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     
                     {error && (
                         <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '12px', color: '#fca5a5', fontSize: '0.9rem' }}>
@@ -84,33 +100,36 @@ export default function LoginScreen() {
                         </div>
                     )}
 
-                    <div style={{ position: 'relative' }}>
-                        <Mail size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
-                        <input 
-                            type="email" 
-                            placeholder="Email address" 
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            style={inputStyle}
-                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
-                            required
-                        />
-                    </div>
-
-                    <div style={{ position: 'relative' }}>
-                        <Lock size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
-                        <input 
-                            type="password" 
-                            placeholder="Password" 
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            style={inputStyle}
-                            onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-                            onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
-                            required
-                        />
-                    </div>
+                    {step === 'email' ? (
+                        <div style={{ position: 'relative' }}>
+                            <Mail size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
+                            <input 
+                                type="email" 
+                                placeholder="name@company.com" 
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                style={inputStyle}
+                                onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                                onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                                required
+                            />
+                        </div>
+                    ) : (
+                        <div style={{ position: 'relative' }}>
+                            <Lock size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
+                            <input 
+                                type="text" 
+                                placeholder="Enter 6-digit code" 
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                                style={{ ...inputStyle, textAlign: 'center', paddingLeft: '16px', letterSpacing: '0.5em', fontSize: '1.2rem', fontWeight: '800' }}
+                                onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                                onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                                required
+                                maxLength={6}
+                            />
+                        </div>
+                    )}
 
                     <button 
                         type="submit" 
@@ -137,17 +156,25 @@ export default function LoginScreen() {
                         onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(-2px)'; }}
                         onMouseLeave={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
-                        {isLoading ? 'Authenticating...' : 'Sign In'}
+                        {isLoading ? (step === 'email' ? 'Sending code...' : 'Verifying...') : (step === 'email' ? 'Continue' : 'Sign In')}
                         {!isLoading && <ArrowRight size={18} />}
                     </button>
+
+                    {step === 'otp' && (
+                        <button 
+                            type="button"
+                            onClick={() => setStep('email')}
+                            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.85rem', cursor: 'pointer', marginTop: '8px', textDecoration: 'underline' }}
+                        >
+                            Change email address
+                        </button>
+                    )}
                 </form>
 
                 <div style={{ marginTop: '32px', textAlign: 'center', paddingTop: '24px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '0 0 12px 0' }}>Demo Accounts (Password: admin123)</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: '#94a3b8' }}>
-                        <span><strong>Super Admin:</strong> sarah@agencyos.com</span>
-                        <span><strong>Admin:</strong> mike@agencyos.com</span>
-                        <span><strong>Editor:</strong> jasmine@agencyos.com</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#64748b', fontSize: '0.85rem' }}>
+                        <ShieldCheck size={14} />
+                        <span>Secure, passwordless authentication</span>
                     </div>
                 </div>
             </div>

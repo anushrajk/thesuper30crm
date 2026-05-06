@@ -18,9 +18,15 @@ export default function Home() {
   const pipelineClients = clients.filter(c => PIPELINE_STAGES.includes(c.stage));
 
   // Function to handle adding a new client
-  const handleAddClient = (newClient) => {
-    addClient({
-      ...newClient,
+  const handleAddClient = async (formData) => {
+    // Transform services object to array for Supabase text[] column
+    const servicesArray = Object.entries(formData.services || {})
+      .filter(([_, value]) => value === true)
+      .map(([key]) => key);
+
+    await addClient({
+      ...formData,
+      services: servicesArray,
       stage: 'inquiry'
     });
     setIsModalOpen(false);

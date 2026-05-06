@@ -1,105 +1,138 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_TASKS } from '../data/tasks';
+import { supabase } from '../lib/supabaseClient';
 
 const TaskContext = createContext();
 
-export function TaskProvider({ children }) {
-    const [notifications, setNotifications] = useState([]);
+const mapTask = (t) => ({
+    ...t,
+    clientId: t.client_id,
+    assigneeId: t.assignee_id,
+    dueDate: t.due_date,
+    completionDate: t.completion_date,
+    createdAt: t.created_at
+});
+
+const unmapTask = (t) => {
+    const out = { ...t };
+    if (t.clientId !== undefined) out.client_id = t.clientId;
+    if (t.assigneeId !== undefined) out.assignee_id = t.assigneeId;
+    if (t.dueDate !== undefined) out.due_date = t.dueDate;
+    if (t.completionDate !== undefined) out.completion_date = t.completionDate;
+    if (t.createdAt !== undefined) out.created_at = t.createdAt;
     
-    // Initialize tasks from localStorage or fall back to mock data
-    const [tasks, setTasks] = useState(() => {
-        let initialTasks = INITIAL_TASKS;
-        if (typeof window !== 'undefined') {
-            try {
-                const saved = localStorage.getItem('molten_tasks');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    // Migrate legacy fields to 'notes'
-                    return parsed.map(t => ({
-                        ...t,
-                        notes: t.notes || (t.description ? `${t.description}${t.remarks ? `\n\nRemarks: ${t.remarks}` : ''}` : t.remarks || '')
-                    }));
-                }
-            } catch (error) {
-                console.error('Error parsing task data from localStorage:', error);
-            }
-        }
-        return initialTasks.map(t => ({
-            ...t,
-            notes: t.notes || (t.description ? `${t.description}${t.remarks ? `\n\nRemarks: ${t.remarks}` : ''}` : t.remarks || '')
-        }));
-    });
+    // Remove the camelCase ones to avoid double data
+    delete out.clientId;
+    delete out.assigneeId;
+    delete out.dueDate;
+    delete out.completionDate;
+    delete out.createdAt;
+    return out;
+};
 
-    // Persist to localStorage whenever tasks change
+export function TaskProvider({ children }) {
+    const [tasks, setTasks] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [selectedTaskId, setSelectedTaskId] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Initial Fetch & Realtime Subscription
     useEffect(() => {
-        const handleStorageChange = (e) => {
-            if (e.key === 'molten_tasks' && e.newValue) {
-                try {
-                    setTasks(JSON.parse(e.newValue));
-                } catch (error) {
-                    console.error('Error parsing updated task data from storage event:', error);
-                }
-            }
-        };
+        fetchTasks();
 
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
+        // Subscribe to real-time changes
+        const channel = supabase
+            .channel('public:tasks')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setTasks(prev => [...prev, mapTask(payload.new)]);
+                } else if (payload.eventType === 'UPDATE') {
+                    setTasks(prev => prev.map(t => t.id === payload.new.id ? mapTask(payload.new) : t));
+                } else if (payload.eventType === 'DELETE') {
+                    setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('molten_tasks', JSON.stringify(tasks));
+    const fetchTasks = async () => {
+        const { data, error } = await supabase
+            .from('tasks')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (!error && data) {
+            setTasks(data.map(mapTask));
         }
-    }, [tasks]);
-
-    // Data Accessors
-
-    // Get all tasks (useful for debug or admin)
-    const getAllTasks = () => tasks;
-
-    // Get tasks for a specific client
-    const getClientTasks = (clientId) => {
-        return tasks.filter(task => task.clientId === clientId);
+        setIsLoading(false);
     };
 
-    // Get "Today's" tasks
-    // Logic: Due Date is Today OR Status is 'in-progress' (optional) OR manually flagged
-    // For this agency model: We show everything "To Do" or "In Progress" that is due today or overdue, 
-    // OR any task specifically moved to "Today" status in a Kanban flow if we implement that.
-    // However, the prompt says "Drag-and-drop enabled... Only tasks scheduled for today appear here".
-    // AND "Today's Focus" has columns: To Do, In Progress, Done.
-    // So "Today's Focus" is a VIEW of tasks that are relevant for today.
-
-    // We will treat "Today" as tasks that match the date OR are manually set to show in Today view.
-    // For simplicity V1: We filter by a 'isToday' flag or date match.
-    // But the prompt implies "Today's Focus" is a specific board.
-    // Let's assume we filter by dueDate === today OR status changes made today.
-
-    // Actually, looking at the previous 'Today' page, it had 'Today', 'Waiting', 'Done' columns.
-    // The master prompt says 'To Do', 'In Progress', 'Done'.
-    // Let's stick to the Master Prompt columns for the "Today Board".
-
+    // Data Accessors
+    const getAllTasks = () => tasks;
+    const getClientTasks = (clientId) => tasks.filter(t => t.clientId === clientId);
     const getTodayTasks = () => {
         const todayStr = new Date().toISOString().split('T')[0];
         return tasks.filter(task => {
-            // Task is for today if:
-            // 1. Due date is today
-            // 2. OR it was explicitly added to Today's pile (we might need a flag for this)
-            // 3. Status is 'in-progress' usually implies it's being worked on.
-
-            // For now, let's include anything with dueDate <= todayStr AND status != 'done'
-            // PLUS anything recently marked done today.
-            if (task.status === 'done') {
-                // Ideally filter done tasks to show only those completed today, but for now show all done today
-                return task.dueDate === todayStr;
-            }
+            if (task.status === 'done') return task.dueDate === todayStr;
             return task.dueDate <= todayStr;
         });
     };
 
+    const getSelectedTask = () => tasks.find(t => t.id === selectedTaskId);
+
     // Actions
+    const addTask = async (taskData) => {
+        const dbTask = unmapTask(taskData);
+        const { data, error } = await supabase
+            .from('tasks')
+            .insert([{
+                ...dbTask,
+                status: taskData.status || 'todo',
+                priority: taskData.priority || 'medium',
+                created_at: new Date()
+            }])
+            .select();
+
+        if (error) {
+            console.error('Error adding task:', error);
+            return null;
+        }
+
+        return mapTask(data[0]);
+    };
+
+    const updateTask = async (taskId, updates) => {
+        // Optimistic update
+        const mappedUpdates = updates; // they are already camelCase from UI
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...mappedUpdates } : t));
+
+        const dbUpdates = unmapTask(updates);
+        const { error } = await supabase
+            .from('tasks')
+            .update(dbUpdates)
+            .eq('id', taskId);
+
+        if (error) {
+            console.error('Error updating task:', error);
+            fetchTasks();
+        }
+    };
+
+    const deleteTask = async (taskId) => {
+        const { error } = await supabase
+            .from('tasks')
+            .delete()
+            .eq('id', taskId);
+
+        if (error) {
+            console.error('Error deleting task:', error);
+        }
+    };
 
     const addNotification = (title, message, type = 'info', userId = null) => {
         const newNotif = {
@@ -107,7 +140,7 @@ export function TaskProvider({ children }) {
             title,
             message,
             type,
-            userId, // Targeted notification
+            userId,
             read: false,
             createdAt: new Date().toISOString()
         };
@@ -118,59 +151,8 @@ export function TaskProvider({ children }) {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     };
 
-    const addTask = (taskData) => {
-        const newTask = {
-            id: `t-${Date.now()}`,
-            createdAt: new Date().toISOString(),
-            status: 'todo', // Default
-            priority: 'medium', // Default
-            ...taskData
-        };
-        setTasks(prev => [...prev, newTask]);
-
-        // Notify if assigned to someone
-        if (newTask.assigneeId) {
-            addNotification('New Task Assigned', `Task: ${newTask.title}`, 'task', newTask.assigneeId);
-        }
-
-        return newTask;
-    };
-
-    const insertTaskAfter = (precedingTaskId, taskData) => {
-        const newTask = {
-            id: `t-${Date.now()}`,
-            createdAt: new Date().toISOString(),
-            status: 'todo',
-            priority: 'medium',
-            ...taskData
-        };
-        setTasks(prev => {
-            const index = prev.findIndex(t => t.id === precedingTaskId);
-            if (index === -1) return [...prev, newTask];
-            const newTasks = [...prev];
-            newTasks.splice(index + 1, 0, newTask);
-            return newTasks;
-        });
-        return newTask;
-    };
-
-    const updateTask = (taskId, updates) => {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
-    };
-
-    const deleteTask = (taskId) => {
-        setTasks(prev => prev.filter(t => t.id !== taskId));
-    };
-
-    const [selectedTaskId, setSelectedTaskId] = useState(null);
-
-    // ... existing initialization ...
-
     const openTask = (id) => setSelectedTaskId(id);
     const closeTask = () => setSelectedTaskId(null);
-
-    // Data Accessors include getSelectedTask
-    const getSelectedTask = () => tasks.find(t => t.id === selectedTaskId);
 
     const SERVICE_TYPES = [
         { id: 'seo', label: 'SEO' },
@@ -182,27 +164,25 @@ export function TaskProvider({ children }) {
         { id: 'other', label: 'Other' }
     ];
 
-    const value = {
-        tasks,
-        selectedTaskId,
-        openTask,
-        closeTask,
-        getSelectedTask,
-        getAllTasks,
-        getClientTasks,
-        getTodayTasks,
-        addTask,
-        insertTaskAfter,
-        updateTask,
-        deleteTask,
-        SERVICE_TYPES,
-        notifications,
-        addNotification,
-        markAllNotificationsRead
-    };
-
     return (
-        <TaskContext.Provider value={value}>
+        <TaskContext.Provider value={{
+            tasks,
+            isLoading,
+            selectedTaskId,
+            openTask,
+            closeTask,
+            getSelectedTask,
+            getAllTasks,
+            getClientTasks,
+            getTodayTasks,
+            addTask,
+            updateTask,
+            deleteTask,
+            SERVICE_TYPES,
+            notifications,
+            addNotification,
+            markAllNotificationsRead
+        }}>
             {children}
         </TaskContext.Provider>
     );
@@ -213,6 +193,7 @@ export function useTasks() {
     if (!context) {
         return {
             tasks: [],
+            isLoading: true,
             selectedTaskId: null,
             openTask: () => { },
             closeTask: () => { },
@@ -221,7 +202,6 @@ export function useTasks() {
             getClientTasks: () => [],
             getTodayTasks: () => [],
             addTask: () => ({ id: 'temp' }),
-            insertTaskAfter: () => ({ id: 'temp' }),
             updateTask: () => { },
             deleteTask: () => { },
             SERVICE_TYPES: []
