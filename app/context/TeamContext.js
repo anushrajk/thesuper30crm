@@ -75,11 +75,12 @@ export function TeamProvider({ children }) {
         }
     };
 
-    const sendOtp = async (email) => {
+    const sendOtp = async (email, options = {}) => {
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
                 emailRedirectTo: window.location.origin,
+                ...options
             }
         });
 

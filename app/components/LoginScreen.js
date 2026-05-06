@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { useTeam } from '../context/TeamContext';
-import { Lock, Mail, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, User, RefreshCw } from 'lucide-react';
 
 export default function LoginScreen() {
     const { sendOtp, verifyOtp } = useTeam();
     const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
     const [otp, setOtp] = useState('');
+    const [mode, setMode] = useState('login'); // 'login' or 'signup'
     const [step, setStep] = useState('email'); // 'email' or 'otp'
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -17,11 +19,18 @@ export default function LoginScreen() {
         setError('');
         setIsLoading(true);
 
-        const result = await sendOtp(email);
+        // For signup, we can pass metadata to Supabase
+        const options = mode === 'signup' ? { data: { name } } : {};
+        
+        const result = await sendOtp(email, options);
         if (result.success) {
             setStep('otp');
         } else {
-            setError(result.error);
+            if (result.error.includes('rate limit')) {
+                setError('Please wait 60 seconds before requesting another code.');
+            } else {
+                setError(result.error);
+            }
         }
         setIsLoading(false);
     };
@@ -87,9 +96,28 @@ export default function LoginScreen() {
                     </div>
                     <h1 style={{ fontSize: '2rem', fontWeight: '800', color: 'white', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>Agency OS</h1>
                     <p style={{ color: '#94a3b8', fontSize: '1rem', margin: 0 }}>
-                        {step === 'email' ? 'Enter your email to receive a login code' : `We've sent a code to ${email}`}
+                        {step === 'email' 
+                            ? (mode === 'login' ? 'Welcome back! Sign in to your account' : 'Create your agency account to get started') 
+                            : `We've sent a code to ${email}`}
                     </p>
                 </div>
+
+                {step === 'email' && (
+                    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '12px', marginBottom: '24px' }}>
+                        <button 
+                            onClick={() => setMode('login')}
+                            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: mode === 'login' ? '#6366f1' : 'transparent', color: 'white', fontWeight: '600', cursor: 'pointer', transition: '0.2s' }}
+                        >
+                            Sign In
+                        </button>
+                        <button 
+                            onClick={() => setMode('signup')}
+                            style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: mode === 'signup' ? '#6366f1' : 'transparent', color: 'white', fontWeight: '600', cursor: 'pointer', transition: '0.2s' }}
+                        >
+                            Sign Up
+                        </button>
+                    </div>
+                )}
 
                 <form onSubmit={step === 'email' ? handleSendOtp : handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     
@@ -101,19 +129,32 @@ export default function LoginScreen() {
                     )}
 
                     {step === 'email' ? (
-                        <div style={{ position: 'relative' }}>
-                            <Mail size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
-                            <input 
-                                type="email" 
-                                placeholder="name@company.com" 
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                style={inputStyle}
-                                onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-                                onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
-                                required
-                            />
-                        </div>
+                        <>
+                            {mode === 'signup' && (
+                                <div style={{ position: 'relative' }}>
+                                    <User size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Full Name" 
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        style={inputStyle}
+                                        required
+                                    />
+                                </div>
+                            )}
+                            <div style={{ position: 'relative' }}>
+                                <Mail size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
+                                <input 
+                                    type="email" 
+                                    placeholder="name@company.com" 
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    style={inputStyle}
+                                    required
+                                />
+                            </div>
+                        </>
                     ) : (
                         <div style={{ position: 'relative' }}>
                             <Lock size={20} color="#94a3b8" style={{ position: 'absolute', top: '16px', left: '16px' }} />
@@ -123,8 +164,6 @@ export default function LoginScreen() {
                                 value={otp}
                                 onChange={(e) => setOtp(e.target.value)}
                                 style={{ ...inputStyle, textAlign: 'center', paddingLeft: '16px', letterSpacing: '0.5em', fontSize: '1.2rem', fontWeight: '800' }}
-                                onFocus={(e) => { e.target.style.borderColor = '#6366f1'; e.target.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-                                onBlur={(e) => { e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'; e.target.style.background = 'rgba(255, 255, 255, 0.05)'; }}
                                 required
                                 maxLength={6}
                             />
@@ -153,8 +192,6 @@ export default function LoginScreen() {
                             boxShadow: '0 4px 15px -3px rgba(99, 102, 241, 0.4)',
                             opacity: isLoading ? 0.7 : 1
                         }}
-                        onMouseEnter={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                        onMouseLeave={(e) => { if (!isLoading) e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
                         {isLoading ? (step === 'email' ? 'Sending code...' : 'Verifying...') : (step === 'email' ? 'Continue' : 'Sign In')}
                         {!isLoading && <ArrowRight size={18} />}
@@ -164,9 +201,10 @@ export default function LoginScreen() {
                         <button 
                             type="button"
                             onClick={() => setStep('email')}
-                            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.85rem', cursor: 'pointer', marginTop: '8px', textDecoration: 'underline' }}
+                            style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.85rem', cursor: 'pointer', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                         >
-                            Change email address
+                            <RefreshCw size={14} />
+                            Change email or name
                         </button>
                     )}
                 </form>
