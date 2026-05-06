@@ -12,6 +12,11 @@ export function TeamProvider({ children }) {
 
     // Initial session check and listener
     useEffect(() => {
+        if (!supabase) {
+            setIsLoading(false);
+            return;
+        }
+
         // Check for existing session
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) {
@@ -38,6 +43,7 @@ export function TeamProvider({ children }) {
     }, []);
 
     const fetchProfile = async (user) => {
+        if (!supabase) return;
         try {
             const { data, error } = await supabase
                 .from('profiles')
